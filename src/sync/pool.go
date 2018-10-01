@@ -125,11 +125,11 @@ func (p *Pool) Get() interface{} {
 	if race.Enabled {
 		race.Disable()
 	}
-	l := p.pin()
-	x := l.private
+	l := p.pin()   // 获取当前线程的poolLocal, 也就是p.local[pid]
+	x := l.private // 判断临时变了是否有值，有值即返回
 	l.private = nil
 	runtime_procUnpin()
-	if x == nil {
+	if x == nil { // 临时对象没值到本地的缓存列表中取
 		l.Lock()
 		last := len(l.shared) - 1
 		if last >= 0 {
@@ -138,7 +138,7 @@ func (p *Pool) Get() interface{} {
 		}
 		l.Unlock()
 		if x == nil {
-			x = p.getSlow()
+			x = p.getSlow() // 当本线程的缓存对象已经没有, 去其他现场缓存列表中取
 		}
 	}
 	if race.Enabled {
@@ -147,7 +147,7 @@ func (p *Pool) Get() interface{} {
 			race.Acquire(poolRaceAddr(x))
 		}
 	}
-	if x == nil && p.New != nil {
+	if x == nil && p.New != nil { // 其他线程没有，那么new一个
 		x = p.New()
 	}
 	return x
@@ -160,7 +160,7 @@ func (p *Pool) getSlow() (x interface{}) {
 	// Try to steal one element from other procs.
 	pid := runtime_procPin()
 	runtime_procUnpin()
-	for i := 0; i < int(size); i++ {
+	for i := 0; i < int(size); i++ { // 遍历其他线程的缓存队列
 		l := indexLocal(local, (pid+i+1)%int(size))
 		l.Lock()
 		last := len(l.shared) - 1

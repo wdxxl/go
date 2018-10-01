@@ -1223,7 +1223,7 @@ func (r *Request) ParseForm() error {
 // disk in temporary files.
 // ParseMultipartForm calls ParseForm if necessary.
 // After one call to ParseMultipartForm, subsequent calls have no effect.
-func (r *Request) ParseMultipartForm(maxMemory int64) error {
+func (r *Request) ParseMultipartForm(maxMemory int64) error { // 32 << 20 // 32 MB
 	if r.MultipartForm == multipartByReader {
 		return errors.New("http: multipart handled by MultipartReader")
 	}

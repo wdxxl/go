@@ -2443,8 +2443,8 @@ func ServeTLS(l net.Listener, handler Handler, certFile, keyFile string) error {
 // A Server defines parameters for running an HTTP server.
 // The zero value for Server is a valid configuration.
 type Server struct {
-	Addr    string  // TCP address to listen on, ":http" if empty
-	Handler Handler // handler to invoke, http.DefaultServeMux if nil
+	Addr    string  // TCP address to listen on, ":http" if empty     // 监听地址
+	Handler Handler // handler to invoke, http.DefaultServeMux if nil // 路由
 
 	// TLSConfig optionally provides a TLS configuration for use
 	// by ServeTLS and ListenAndServeTLS. Note that this value is
@@ -2453,7 +2453,7 @@ type Server struct {
 	// tls.Config.SetSessionTicketKeys. To use
 	// SetSessionTicketKeys, use Server.Serve with a TLS Listener
 	// instead.
-	TLSConfig *tls.Config
+	TLSConfig *tls.Config // https 相关配置
 
 	// ReadTimeout is the maximum duration for reading the entire
 	// request, including the body.
@@ -2462,32 +2462,32 @@ type Server struct {
 	// decisions on each request body's acceptable deadline or
 	// upload rate, most users will prefer to use
 	// ReadHeaderTimeout. It is valid to use them both.
-	ReadTimeout time.Duration
+	ReadTimeout time.Duration // 读取请求最长时长
 
 	// ReadHeaderTimeout is the amount of time allowed to read
 	// request headers. The connection's read deadline is reset
 	// after reading the headers and the Handler can decide what
 	// is considered too slow for the body.
-	ReadHeaderTimeout time.Duration
+	ReadHeaderTimeout time.Duration // 读取请求Header最长时长
 
 	// WriteTimeout is the maximum duration before timing out
 	// writes of the response. It is reset whenever a new
 	// request's header is read. Like ReadTimeout, it does not
 	// let Handlers make decisions on a per-request basis.
-	WriteTimeout time.Duration
+	WriteTimeout time.Duration // 写Response最长时长
 
 	// IdleTimeout is the maximum amount of time to wait for the
 	// next request when keep-alives are enabled. If IdleTimeout
 	// is zero, the value of ReadTimeout is used. If both are
 	// zero, ReadHeaderTimeout is used.
-	IdleTimeout time.Duration
+	IdleTimeout time.Duration // 链接最大空闲时长
 
 	// MaxHeaderBytes controls the maximum number of bytes the
 	// server will read parsing the request header's keys and
 	// values, including the request line. It does not limit the
 	// size of the request body.
 	// If zero, DefaultMaxHeaderBytes is used.
-	MaxHeaderBytes int
+	MaxHeaderBytes int // 请求头最大长度
 
 	// TLSNextProto optionally specifies a function to take over
 	// ownership of the provided TLS connection when an NPN/ALPN
@@ -2498,18 +2498,18 @@ type Server struct {
 	// automatically closed when the function returns.
 	// If TLSNextProto is not nil, HTTP/2 support is not enabled
 	// automatically.
-	TLSNextProto map[string]func(*Server, *tls.Conn, Handler)
+	TLSNextProto map[string]func(*Server, *tls.Conn, Handler) // 协议协商函数
 
 	// ConnState specifies an optional callback function that is
 	// called when a client connection changes state. See the
 	// ConnState type and associated constants for details.
-	ConnState func(net.Conn, ConnState)
+	ConnState func(net.Conn, ConnState) // 链接状态 - 改变的时候回调
 
 	// ErrorLog specifies an optional logger for errors accepting
 	// connections, unexpected behavior from handlers, and
 	// underlying FileSystem errors.
 	// If nil, logging is done via the log package's standard logger.
-	ErrorLog *log.Logger
+	ErrorLog *log.Logger //允许自定义日志
 
 	disableKeepAlives int32     // accessed atomically.
 	inShutdown        int32     // accessed atomically (non-zero means we're in Shutdown)
@@ -2557,7 +2557,7 @@ func (s *Server) closeDoneChanLocked() {
 //
 // Close returns any error returned from closing the Server's
 // underlying Listener(s).
-func (srv *Server) Close() error {
+func (srv *Server) Close() error { // 关闭
 	atomic.StoreInt32(&srv.inShutdown, 1)
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
@@ -2599,7 +2599,7 @@ var shutdownPollInterval = 500 * time.Millisecond
 //
 // Once Shutdown has been called on a server, it may not be reused;
 // future calls to methods such as Serve will return ErrServerClosed.
-func (srv *Server) Shutdown(ctx context.Context) error {
+func (srv *Server) Shutdown(ctx context.Context) error { // 平滑关闭
 	atomic.StoreInt32(&srv.inShutdown, 1)
 
 	srv.mu.Lock()
@@ -2629,7 +2629,7 @@ func (srv *Server) Shutdown(ctx context.Context) error {
 // undergone NPN/ALPN protocol upgrade or that have been hijacked.
 // This function should start protocol-specific graceful shutdown,
 // but should not wait for shutdown to complete.
-func (srv *Server) RegisterOnShutdown(f func()) {
+func (srv *Server) RegisterOnShutdown(f func()) { // 关闭服务的时候，平滑关闭的时候调用func
 	srv.mu.Lock()
 	srv.onShutdown = append(srv.onShutdown, f)
 	srv.mu.Unlock()
@@ -2749,7 +2749,7 @@ func (sh serverHandler) ServeHTTP(rw ResponseWriter, req *Request) {
 //
 // ListenAndServe always returns a non-nil error. After Shutdown or Close,
 // the returned error is ErrServerClosed.
-func (srv *Server) ListenAndServe() error {
+func (srv *Server) ListenAndServe() error { // 监听并开启http服务
 	if srv.shuttingDown() {
 		return ErrServerClosed
 	}
@@ -2762,6 +2762,7 @@ func (srv *Server) ListenAndServe() error {
 		return err
 	}
 	return srv.Serve(tcpKeepAliveListener{ln.(*net.TCPListener)})
+	// 断言转类型，然后keepAlive封装，很多程度上会自己封装一份，keepAlive并不见得是什么好事情
 }
 
 var testHookServerServe func(*Server, net.Listener) // used if non-nil
@@ -2802,13 +2803,13 @@ var ErrServerClosed = errors.New("http: Server closed")
 //
 // Serve always returns a non-nil error and closes l.
 // After Shutdown or Close, the returned error is ErrServerClosed.
-func (srv *Server) Serve(l net.Listener) error {
+func (srv *Server) Serve(l net.Listener) error { // 监听并开启
 	if fn := testHookServerServe; fn != nil {
 		fn(srv, l) // call hook with unwrapped listener
 	}
 
 	l = &onceCloseListener{Listener: l}
-	defer l.Close()
+	defer l.Close() // 函数推出时 关闭
 
 	if err := srv.setupHTTP2_Serve(); err != nil {
 		return err
@@ -2819,9 +2820,9 @@ func (srv *Server) Serve(l net.Listener) error {
 	}
 	defer srv.trackListener(&l, false)
 
-	var tempDelay time.Duration     // how long to sleep on accept failure
-	baseCtx := context.Background() // base is always background, per Issue 16220
-	ctx := context.WithValue(baseCtx, ServerContextKey, srv)
+	var tempDelay time.Duration                              // how long to sleep on accept failure （动态规划）
+	baseCtx := context.Background()                          // base is always background, per Issue 16220
+	ctx := context.WithValue(baseCtx, ServerContextKey, srv) // 信息记录到Context中，方便以后调用
 	for {
 		rw, e := l.Accept()
 		if e != nil {
@@ -2830,7 +2831,7 @@ func (srv *Server) Serve(l net.Listener) error {
 				return ErrServerClosed
 			default:
 			}
-			if ne, ok := e.(net.Error); ok && ne.Temporary() {
+			if ne, ok := e.(net.Error); ok && ne.Temporary() { // 断言网络异常，临时性错误
 				if tempDelay == 0 {
 					tempDelay = 5 * time.Millisecond
 				} else {
@@ -2848,7 +2849,7 @@ func (srv *Server) Serve(l net.Listener) error {
 		tempDelay = 0
 		c := srv.newConn(rw)
 		c.setState(c.rwc, StateNew) // before Serve can return
-		go c.serve(ctx)
+		go c.serve(ctx)             // 并发处理链接
 	}
 }
 
@@ -2865,7 +2866,7 @@ func (srv *Server) Serve(l net.Listener) error {
 //
 // ServeTLS always returns a non-nil error. After Shutdown or Close, the
 // returned error is ErrServerClosed.
-func (srv *Server) ServeTLS(l net.Listener, certFile, keyFile string) error {
+func (srv *Server) ServeTLS(l net.Listener, certFile, keyFile string) error { // 监听并开启https
 	// Setup HTTP/2 before srv.Serve, to initialize srv.TLSConfig
 	// before we clone it and create the TLS Listener.
 	if err := srv.setupHTTP2_ServeTLS(); err != nil {
@@ -2873,7 +2874,7 @@ func (srv *Server) ServeTLS(l net.Listener, certFile, keyFile string) error {
 	}
 
 	config := cloneTLSConfig(srv.TLSConfig)
-	if !strSliceContains(config.NextProtos, "http/1.1") {
+	if !strSliceContains(config.NextProtos, "http/1.1") { // 没有的话 就给他们加上 http/1.1
 		config.NextProtos = append(config.NextProtos, "http/1.1")
 	}
 
@@ -3029,7 +3030,7 @@ func ListenAndServeTLS(addr, certFile, keyFile string, handler Handler) error {
 //
 // ListenAndServeTLS always returns a non-nil error. After Shutdown or
 // Close, the returned error is ErrServerClosed.
-func (srv *Server) ListenAndServeTLS(certFile, keyFile string) error {
+func (srv *Server) ListenAndServeTLS(certFile, keyFile string) error { // 监听并开启Https服务
 	if srv.shuttingDown() {
 		return ErrServerClosed
 	}
