@@ -11,7 +11,7 @@ type MIMEHeader map[string][]string
 // Add adds the key, value pair to the header.
 // It appends to any existing values associated with key.
 func (h MIMEHeader) Add(key, value string) {
-	key = CanonicalMIMEHeaderKey(key)
+	key = CanonicalMIMEHeaderKey(key) // Http Header 把对应的key 大小写转换的地方
 	h[key] = append(h[key], value)
 }
 

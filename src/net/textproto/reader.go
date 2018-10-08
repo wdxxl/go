@@ -569,7 +569,7 @@ func (r *Reader) upcomingHeaderNewlines() (n int) {
 // MIME header keys are assumed to be ASCII only.
 // If s contains a space or invalid header field bytes, it is
 // returned without modifications.
-func CanonicalMIMEHeaderKey(s string) string {
+func CanonicalMIMEHeaderKey(s string) string { // HTTP Header 转换的原因
 	// Quick check for canonical encoding.
 	upper := true
 	for i := 0; i < len(s); i++ {
