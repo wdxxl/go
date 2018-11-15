@@ -46,10 +46,10 @@ type InternalBenchmark struct {
 // are always printed, so as not to hide output whose existence may be
 // affecting benchmark results.
 type B struct {
-	common
+	common           //继承common 结构体
 	importPath       string // import path of the package containing the benchmark
 	context          *benchContext
-	N                int
+	N                int           // 循环次数
 	previousN        int           // number of iterations in the previous run
 	previousDuration time.Duration // total duration of the previous run
 	benchFunc        func(b *B)

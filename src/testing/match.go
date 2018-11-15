@@ -54,7 +54,7 @@ func (m *matcher) fullName(c *common, subname string) (name string, ok, partial 
 	defer m.mu.Unlock()
 
 	if c != nil && c.level > 0 {
-		name = m.unique(c.name, rewrite(subname))
+		name = m.unique(c.name, rewrite(subname)) // 比如 TestXXX/happy_path
 	}
 
 	matchMutex.Lock()
@@ -132,7 +132,7 @@ func (m *matcher) unique(parent, subname string) string {
 
 // rewrite rewrites a subname to having only printable characters and no white
 // space.
-func rewrite(s string) string {
+func rewrite(s string) string { // UnitTest 那么加下划线的地方
 	b := []byte{}
 	for _, r := range s {
 		switch {

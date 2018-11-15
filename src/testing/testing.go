@@ -403,7 +403,7 @@ func (c *common) frameSkip(skip int) runtime.Frame {
 // decorate prefixes the string with the file and line of the call site
 // and inserts the final newline if needed and indentation spaces for formatting.
 // This function must be called with c.mu held.
-func (c *common) decorate(s string) string {
+func (c *common) decorate(s string) string { // 修饰
 	frame := c.frameSkip(3) // decorate + log + public function.
 	file := frame.File
 	line := frame.Line
@@ -520,7 +520,7 @@ var _ TB = (*B)(nil)
 // The other reporting methods, such as the variations of Log and Error,
 // may be called simultaneously from multiple goroutines.
 type T struct {
-	common
+	common // 继承 common
 	isParallel bool
 	context    *testContext // For running tests and subtests.
 }
@@ -556,7 +556,7 @@ func (c *common) Fail() {
 }
 
 // Failed reports whether the function has failed.
-func (c *common) Failed() bool {
+func (c *common) Failed() bool { // 函数是否运行失败
 	c.mu.RLock()
 	failed := c.failed
 	c.mu.RUnlock()
@@ -593,14 +593,14 @@ func (c *common) FailNow() {
 	// it would run on a test failure. Because we send on c.signal during
 	// a top-of-stack deferred function now, we know that the send
 	// only happens after any other stacked defers have completed.
-	c.finished = true
-	runtime.Goexit()
+	c.finished = true // finished 为true
+	runtime.Goexit()  // 退出
 }
 
 // log generates the output. It's always at the same stack depth.
 func (c *common) log(s string) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
+	defer c.mu.Unlock() // 锁
 	c.output = append(c.output, c.decorate(s)...)
 }
 
@@ -626,13 +626,13 @@ func (c *common) Error(args ...interface{}) {
 // Errorf is equivalent to Logf followed by Fail.
 func (c *common) Errorf(format string, args ...interface{}) {
 	c.log(fmt.Sprintf(format, args...))
-	c.Fail()
+	c.Fail() // 只代表单一的测试问题
 }
 
 // Fatal is equivalent to Log followed by FailNow.
 func (c *common) Fatal(args ...interface{}) {
 	c.log(fmt.Sprintln(args...))
-	c.FailNow()
+	c.FailNow() // Fatal是结束测试
 }
 
 // Fatalf is equivalent to Logf followed by FailNow.
@@ -644,13 +644,13 @@ func (c *common) Fatalf(format string, args ...interface{}) {
 // Skip is equivalent to Log followed by SkipNow.
 func (c *common) Skip(args ...interface{}) {
 	c.log(fmt.Sprintln(args...))
-	c.SkipNow()
+	c.SkipNow() // finished 为true 然后退出
 }
 
 // Skipf is equivalent to Logf followed by SkipNow.
 func (c *common) Skipf(format string, args ...interface{}) {
 	c.log(fmt.Sprintf(format, args...))
-	c.SkipNow()
+	c.SkipNow() // finish为true 然后退出
 }
 
 // SkipNow marks the test as having been skipped and stops its execution
@@ -663,8 +663,8 @@ func (c *common) Skipf(format string, args ...interface{}) {
 // those other goroutines.
 func (c *common) SkipNow() {
 	c.skip()
-	c.finished = true
-	runtime.Goexit()
+	c.finished = true // finished 为 true
+	runtime.Goexit() // 退出
 }
 
 func (c *common) skip() {
@@ -676,7 +676,7 @@ func (c *common) skip() {
 // Skipped reports whether the test was skipped.
 func (c *common) Skipped() bool {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
+	defer c.mu.RUnlock() //锁
 	return c.skipped
 }
 
@@ -711,7 +711,7 @@ func callerName(skip int) string {
 // -test.count or -test.cpu, multiple instances of a single test never run in
 // parallel with each other.
 func (t *T) Parallel() {
-	if t.isParallel {
+	if t.isParallel { // 不允许调用多次
 		panic("testing: t.Parallel called multiple times")
 	}
 	t.isParallel = true
@@ -843,7 +843,7 @@ func tRunner(t *T, fn func(t *T)) {
 //
 // Run may be called simultaneously from multiple goroutines, but all such calls
 // must return before the outer test function for t returns.
-func (t *T) Run(name string, f func(t *T)) bool {
+func (t *T) Run(name string, f func(t *T)) bool { // 常规方法
 	atomic.StoreInt32(&t.hasSub, 1)
 	testName, ok, _ := t.context.match.fullName(&t.common, name)
 	if !ok || shouldFailFast() {
@@ -882,7 +882,7 @@ func (t *T) Run(name string, f func(t *T)) bool {
 	// count correct. This ensures that a sequence of sequential tests runs
 	// without being preempted, even when their parent is a parallel test. This
 	// may especially reduce surprises if *parallel == 1.
-	go tRunner(t, f)
+	go tRunner(t, f) // 并发执行
 	if !<-t.signal {
 		// At this point, it is likely that FailNow was called on one of the
 		// parent tests by one of the subtests. Continue aborting up the chain.
@@ -977,7 +977,7 @@ type M struct {
 	examples   []InternalExample
 
 	timer     *time.Timer
-	afterOnce sync.Once
+	afterOnce sync.Once // 细节
 
 	numRun int
 }
@@ -1034,8 +1034,8 @@ func (m *M) Run() int {
 
 	parseCpuList()
 
-	m.before()
-	defer m.after()
+	m.before()      // 这个看起来有很顺畅
+	defer m.after() // 这个看起来有很顺畅
 	m.startAlarm()
 	haveExamples = len(m.examples) > 0
 	testRan, testOk := runTests(m.deps.MatchString, m.tests)
@@ -1053,7 +1053,7 @@ func (m *M) Run() int {
 	return 0
 }
 
-func (t *T) report() {
+func (t *T) report() { // 打印信息而已
 	if t.parent == nil {
 		return
 	}
@@ -1295,7 +1295,7 @@ func toOutputDir(path string) string {
 }
 
 // startAlarm starts an alarm if requested.
-func (m *M) startAlarm() {
+func (m *M) startAlarm() { // Timeout 相关的
 	if *timeout > 0 {
 		m.timer = time.AfterFunc(*timeout, func() {
 			m.after()
