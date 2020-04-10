@@ -97,7 +97,7 @@ const (
 	// flags
 	iterator     = 1 // there may be an iterator using buckets
 	oldIterator  = 2 // there may be an iterator using oldbuckets
-	hashWriting  = 4 // a goroutine is writing to the map
+	hashWriting  = 4 // a goroutine is writing to the map 在写
 	sameSizeGrow = 8 // the current map growth is to a new map of the same size
 
 	// sentinel bucket ID for iterator checks
@@ -109,12 +109,13 @@ type hmap struct {
 	// Note: the format of the hmap is also encoded in cmd/compile/internal/gc/reflect.go.
 	// Make sure this stays in sync with the compiler's definition.
 	count     int // # live cells == size of map.  Must be first (used by len() builtin)
-	flags     uint8
+	flags     uint8 // 状态 正在写 还是正在扩容
 	B         uint8  // log_2 of # of buckets (can hold up to loadFactor * 2^B items)
 	noverflow uint16 // approximate number of overflow buckets; see incrnoverflow for details
 	hash0     uint32 // hash seed
 
-	buckets    unsafe.Pointer // array of 2^B Buckets. may be nil if count==0.
+	// 扩容相关
+	buckets    unsafe.Pointer // 指向 bmap // array of 2^B Buckets. may be nil if count==0.
 	oldbuckets unsafe.Pointer // previous bucket array of half the size, non-nil only when growing
 	nevacuate  uintptr        // progress counter for evacuation (buckets less than this have been evacuated)
 
@@ -139,8 +140,8 @@ type mapextra struct {
 }
 
 // A bucket for a Go map.
-type bmap struct {
-	// tophash generally contains the top byte of the hash value
+type bmap struct { // 编译的时候会在这个结构体里面加内容 // src/cmd/compile/internal/gc/reflect.go
+ 	// tophash generally contains the top byte of the hash value
 	// for each key in this bucket. If tophash[0] < minTopHash,
 	// tophash[0] is a bucket evacuation state instead.
 	tophash [bucketCnt]uint8
@@ -318,7 +319,7 @@ func makemap(t *maptype, hint int, h *hmap) *hmap {
 	// If hint is large zeroing this memory could take a while.
 	if h.B != 0 {
 		var nextOverflow *bmap
-		h.buckets, nextOverflow = makeBucketArray(t, h.B, nil)
+		h.buckets, nextOverflow = makeBucketArray(t, h.B, nil) // 初始化桶
 		if nextOverflow != nil {
 			h.extra = new(mapextra)
 			h.extra.nextOverflow = nextOverflow
@@ -384,6 +385,10 @@ func makeBucketArray(t *maptype, b uint8, dirtyalloc unsafe.Pointer) (buckets un
 // the key is not in the map.
 // NOTE: The returned pointer may keep the whole map live, so don't
 // hold onto it for very long.
+//  ageMap := make(map[string]int)
+//	ageMap["qcrao"] = 18
+//  // 不带 comma 用法
+//	age1 := ageMap["stefno"]
 func mapaccess1(t *maptype, h *hmap, key unsafe.Pointer) unsafe.Pointer {
 	if raceenabled && h != nil {
 		callerpc := getcallerpc()
@@ -401,9 +406,9 @@ func mapaccess1(t *maptype, h *hmap, key unsafe.Pointer) unsafe.Pointer {
 		throw("concurrent map read and map write")
 	}
 	alg := t.key.alg
-	hash := alg.hash(key, uintptr(h.hash0))
+	hash := alg.hash(key, uintptr(h.hash0)) // 根据因子算hash
 	m := bucketMask(h.B)
-	b := (*bmap)(add(h.buckets, (hash&m)*uintptr(t.bucketsize)))
+	b := (*bmap)(add(h.buckets, (hash&m)*uintptr(t.bucketsize))) //用Key的hash去找桶
 	if c := h.oldbuckets; c != nil {
 		if !h.sameSizeGrow() {
 			// There used to be half as many buckets; mask down one more power of two.
@@ -414,17 +419,18 @@ func mapaccess1(t *maptype, h *hmap, key unsafe.Pointer) unsafe.Pointer {
 			b = oldb
 		}
 	}
-	top := tophash(hash)
-	for ; b != nil; b = b.overflow(t) {
-		for i := uintptr(0); i < bucketCnt; i++ {
+	top := tophash(hash) // 在桶里面找 位置
+	for ; b != nil; b = b.overflow(t) { // overflow 位空的话就结束，否则依次找 //外层
+		for i := uintptr(0); i < bucketCnt; i++ { // 8 个Cell 槽位置 里面找
 			if b.tophash[i] != top {
 				continue
 			}
 			k := add(unsafe.Pointer(b), dataOffset+i*uintptr(t.keysize))
-			if t.indirectkey {
+			if t.indirectkey { //如果是指针的话找内容
 				k = *((*unsafe.Pointer)(k))
 			}
-			if alg.equal(key, k) {
+			if alg.equal(key, k) { // 对比key是否相等
+			    // 找到 Value
 				v := add(unsafe.Pointer(b), dataOffset+bucketCnt*uintptr(t.keysize)+i*uintptr(t.valuesize))
 				if t.indirectvalue {
 					v = *((*unsafe.Pointer)(v))
@@ -436,6 +442,7 @@ func mapaccess1(t *maptype, h *hmap, key unsafe.Pointer) unsafe.Pointer {
 	return unsafe.Pointer(&zeroVal[0])
 }
 
+// age2, ok := ageMap["stefno"]
 func mapaccess2(t *maptype, h *hmap, key unsafe.Pointer) (unsafe.Pointer, bool) {
 	if raceenabled && h != nil {
 		callerpc := getcallerpc()
